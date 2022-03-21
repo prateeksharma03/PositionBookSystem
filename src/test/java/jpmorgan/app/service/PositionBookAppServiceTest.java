@@ -26,6 +26,33 @@ class PositionBookAppServiceTest {
 		PositionBookAppService.positionBook = new PositionBookService();
 		PositionBookAppService.accountMap = new HashMap<>();
 	}
+	
+	/**
+	 * Parameterized test case to verify input data validations
+	 * 
+	 * @param input
+	 * @param expectedErrorMsg
+	 */
+	@ParameterizedTest
+	@MethodSource("processTradeEventRequestValidationTestData")
+	final void testProcessTradeEventShouldThrowErrorInvalidEventId(String[] input, String expectedErrorMsg) {
+		try {
+			PositionBookAppService.processTradeEvent(input);
+		} catch (InvalidRequestException e) {
+			Assertions.assertEquals(true, e.getMessage().contains(expectedErrorMsg));
+			
+		}
+	}
+	
+	private static Stream<Arguments> processTradeEventRequestValidationTestData() {
+	    return Stream.of(
+	      Arguments.of(new String[] { "abc", "BUY", "ACC1", "SECURITY1", "100" }, "Event Id abc is invalid"),
+	      Arguments.of(new String[] { "4", "BUY", "ACC1", "SECURITY1", "abs" }, "Quantity abs is invalid"),
+	      Arguments.of(new String[] { "5", "BUY", "ACC1", "SE1", "10" }, "Security SE1 is invalid"),
+	      Arguments.of(new String[] { "6", "BUY", "ACC2", "SECURITY1", "100" }, "Account ACC2 not found"),
+	      Arguments.of(new String[] { "7", "BOUGHT", "ACC1", "SECURITY1", "100" }, "BOUGHT is invalid")
+	    );
+	}
 
 	/**
 	 * Test case to validate users holdings
@@ -99,37 +126,48 @@ class PositionBookAppServiceTest {
 	 * Test case for the scenario to buy security
 	 */
 	@Test
-	final void testProcessTradeEvent() {
+	final void testProcessTradeBuyEvent() {
 		String expected = "account:ACC3[SECURITY1 100 tradeID:3,BUY, account:ACC3, SECURITY1, 100]";
 		String actual = PositionBookAppService.processTradeEvent(new String[] { "3", "BUY", "ACC3", "SECURITY1", "100" });
 		Assertions.assertEquals(expected.replaceAll("\\[", "").replaceAll("\\]", ""), actual.replace("\n", "").replaceAll("\\[", "").replaceAll("\\]", ""));
 	}
+	
+	/**
+	 * Test case for the scenario to cancel security
+	 */
+	@Test
+	final void testProcessTradeCancelEvent() {
+		String expected = "account:ACC3[SECURITY1 0 tradeID:30,BUY, account:ACC3, SECURITY1, 100]"
+				+ ", [tradeID:30,CANCEL, account:ACC3, SECURITY1, 0]";
+		PositionBookAppService.processTradeEvent(new String[] { "30", "BUY", "ACC3", "SECURITY1", "100" });
+		String actual = PositionBookAppService.processTradeEvent(new String[] { "30", "CANCEL", "ACC3", "SECURITY1", "0" });
+		Assertions.assertEquals(expected.replaceAll("\\[", "").replaceAll("\\]", ""), actual.replace("\n", "").replaceAll("\\[", "").replaceAll("\\]", ""));
+	}
 
 	/**
-	 * Parameterized test case to verify input data validations
-	 * 
-	 * @param input
-	 * @param expectedErrorMsg
+	 * Test case for the scenario to sell security
 	 */
-	@ParameterizedTest
-	@MethodSource("processTradeEventRequestValidationTestData")
-	final void testProcessTradeEventShouldThrowErrorInvalidEventId(String[] input, String expectedErrorMsg) {
+	@Test
+	final void testProcessTradeSellEvent() {
+		String expected = "account:ACC3[SECURITY1 0 tradeID:40,BUY, account:ACC3, SECURITY1, 100]"
+				+ ", [tradeID:41,SELL, account:ACC3, SECURITY1, 100]";
+		PositionBookAppService.processTradeEvent(new String[] { "40", "BUY", "ACC3", "SECURITY1", "100" });
+		String actual = PositionBookAppService.processTradeEvent(new String[] { "41", "SELL", "ACC3", "SECURITY1", "100" });
+		Assertions.assertEquals(expected.replaceAll("\\[", "").replaceAll("\\]", ""), actual.replace("\n", "").replaceAll("\\[", "").replaceAll("\\]", ""));
+	}
+	
+	/**
+	 * Test case for the scenario to verify cancel event will throw error if event id does not exist
+	 */
+	@Test
+	final void testProcessTradeCancelEventThrowException() {
+		String expectedErrorMessage = "Can not cancel or sell order which is not placed! for trade id 51";
 		try {
-			PositionBookAppService.processTradeEvent(input);
+			PositionBookAppService.processTradeEvent(new String[] { "51", "SELL", "ACC3", "SECURITY1", "100" });
 		} catch (InvalidRequestException e) {
-			Assertions.assertEquals(true, e.getMessage().contains(expectedErrorMsg));
+			Assertions.assertEquals(true, e.getMessage().contains(expectedErrorMessage));
 			
 		}
 	}
 	
-	private static Stream<Arguments> processTradeEventRequestValidationTestData() {
-	    return Stream.of(
-	      Arguments.of(new String[] { "abc", "BUY", "ACC1", "SECURITY1", "100" }, "Event Id abc is invalid"),
-	      Arguments.of(new String[] { "4", "BUY", "ACC1", "SECURITY1", "abs" }, "Quantity abs is invalid"),
-	      Arguments.of(new String[] { "5", "BUY", "ACC1", "SE1", "10" }, "Security SE1 is invalid"),
-	      Arguments.of(new String[] { "6", "BUY", "ACC2", "SECURITY1", "100" }, "Account ACC2 not found"),
-	      Arguments.of(new String[] { "7", "BOUGHT", "ACC1", "SECURITY1", "100" }, "BOUGHT is invalid")
-	    );
-	}
-
 }
